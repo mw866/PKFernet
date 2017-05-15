@@ -1,8 +1,5 @@
 {
   "group1-name": {
-//    "ecc.secp224r1.1.enc.pub": "<ECC public key with sec224 curve>",
-//    "ecc.secp224r1.1.sig.pub": "ECC public key with sec224 curve",
-
     "rsa.2048.1.enc.pub": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvaCtjoB90XN1-T8leqLw\niHBXqU-AwOK2GWqV600f5IaaP0s9DxM06EoDivO7/sGUcmWiBw4VkI6Bm/9qIuHI\nm7WuCR2jzLaDr6khtgq-wQNkzgQj9SR-fgtjCg8e-oYJZBxcFMqz4VxrcPOR4XLo\nyA9BVw4OAoyBt7I0IedFfO/f3jF2k2wGDzzgmnRuyFX1HVCha/KtYOv-DZuNNSUE\ndnduePDMp-r7a0Kd0oJlFKnNDTRavsevFpRafbUjaO7g9i0TYxhM9A0GireqVzYs\nZAdtvbWT95ChjHL2R7KrX3p47NdgszpMpjGecf6WKik8qZXyUwSO1EkA2wfK1BRw\nkQIDAQAB\n-----END PUBLIC KEY-----\n",
     "rsa.2048.1.sig.pub": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoZDZzjnzRTSLTHxlfegS\niSfhaVeCiAD2QXrKhOqz9cdAuc0fMd9HR-nB-Xz0FbG/AVVBRnq6JJIU2l9zL02F\njTDDnk0cqSyJkNgYsmRL8YwF/UHU-gYjRS1/uvHtM5PT64D9k4XC65NwmPDCTx-n\nZ28/hg9F7m7sog-hmya6vW4/OpI3Mx3bdUkM2jdAlNLTnMbY0AA0KuvjyXGpoZWl\nxUGFz4/s-NE4FQmsDIia8N90oCx6XpkPcyrRUrK5V/Vm0dB6pZips5TRrPL3ilVx\nM7HFuJFqK-655ELklWPbgwOZn3kPui3u9DfkFK-OOnJmAUuz9ocoV/2F1CJK/m2-\nwQIDAQAB\n-----END PUBLIC KEY-----\n"
   }
