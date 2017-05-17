@@ -24,11 +24,22 @@ class PKFernet:
         .priv]". The signer has to parse out from this header to obtain signing private key alias and the hashing 
         algorithm to use for signing. """
 
+        # Check receiver's encryption public key algorithm
+        if 'rsa.2048.1' not in receiver_enc_pub_key_alias:
+            raise UnsupportedAlgorithm
+        enc_algorithm = b'rsa.2048.1'
+
+        # Check sender's signing private key algorithm
+        if 'rsa_with_sha256.2048.1' not in sender_sign_header:
+            raise UnsupportedAlgorithm
+        sig_algorithm = b'rsa_with_sha256.2048.1'
+        sig_algorithm_b64 = base64.urlsafe_b64encode(sig_algorithm)
+
         # Loading sender's private signing key for signing the message
         sender_sig_priv_key_string = self.deserialize(self.local_private_key_ring['rsa.2048.1.sig.priv'])
         sender_sig_priv_key = serialization.load_pem_private_key(bytes(sender_sig_priv_key_string, 'utf-8'), password=None, backend=default_backend())
 
-        #  Signing the message
+        #  Signing the message using the sender's signing private key
         signer = sender_sig_priv_key.signer(
             padding.PSS(
                 mgf = padding.MGF1(hashes.SHA256()),
@@ -42,9 +53,6 @@ class PKFernet:
         signer.update(msg)
         signature = signer.finalize()
         signature_b64 = base64.urlsafe_b64encode(signature)
-
-        sig_algorithm = b'rsa_with_sha256.2048.1'
-        sig_algorithm_b64 = base64.urlsafe_b64encode(sig_algorithm)
 
         # Symmetrically encrypting message
         R_sym = os.urandom(32)
@@ -77,9 +85,6 @@ class PKFernet:
         )
         R_encrypted_b64 = base64.urlsafe_b64encode(R_encrypted)
 
-        # Encryption algorithm name
-        enc_algorithm = b'rsa.2048.1'
-
         # Ciphertext format: [adata_b64, enc_algorithm, R_encrypted_b64, msg_encrypted_b64, signature_b64, hmac_b64]
         ctx = b'|'.join([adata_b64, enc_algorithm, R_encrypted_b64, msg_encrypted_b64, sig_algorithm_b64, signature_b64, hmac_b64])
         return ctx
@@ -92,10 +97,10 @@ class PKFernet:
         [adata_b64, enc_algorithm, R_encrypted_b64, msg_encrypted_b64, sig_algorithm, signature_b64, hmac_b64]  = ctx_list
         logging.debug('Parsed ciphertext')
 
-        if enc_algorithm != b'rsa.2048.1':
+        if b'rsa.2048.1' not in enc_algorithm:
             raise UnsupportedAlgorithm
 
-        if base64.urlsafe_b64decode(sig_algorithm) != b'rsa_with_sha256.2048.1':
+        if b'rsa_with_sha256.2048.1' not in base64.urlsafe_b64decode(sig_algorithm):
             raise UnsupportedAlgorithm
 
         #  Loading sender's private encryption key
@@ -203,7 +208,7 @@ class TestPKFernet(object):
         # Sender sends the message
         msg = b'this is a test message'
         sender_pf = PKFernet(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='receiver/receiver_pub_keyrings.json')
-        ctx = sender_pf.encrypt(msg, receiver_name='receiver', receiver_enc_pub_key_alias='rsa.2048.1.enc.priv', sender_sign_header='rsa.2048.1.sig.priv', adata='', sign_also = True)
+        ctx = sender_pf.encrypt(msg, receiver_name='receiver', receiver_enc_pub_key_alias='rsa.2048.1.enc.priv', sender_sign_header='rsa_with_sha256.2048.1', adata='', sign_also=True)
 
         # Receiver receives the message
         receiver_pf = PKFernet(priv_keyring='receiver/receiver_priv_keyring.json', public_keyrings='sender/sender_pub_keyrings.json')
