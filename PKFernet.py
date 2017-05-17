@@ -41,8 +41,10 @@ class PKFernet:
             msg = bytes(msg, 'utf-8')
         signer.update(msg)
         signature = signer.finalize()
+        signature_b64 = base64.urlsafe_b64encode(signature)
+
         sig_algorithm = b'rsa_with_sha256.2048.1'
-        signature_b64 = base64.urlsafe_b64encode(sig_algorithm + b'|' + signature)
+        sig_algorithm_b64 = base64.urlsafe_b64encode(sig_algorithm)
 
         # Symmetrically encrypting message
         R_sym = os.urandom(32)
@@ -79,7 +81,7 @@ class PKFernet:
         enc_algorithm = b'rsa.2048.1'
 
         # Ciphertext format: [adata_b64, enc_algorithm, R_encrypted_b64, msg_encrypted_b64, signature_b64, hmac_b64]
-        ctx = b'|'.join([adata_b64, enc_algorithm, R_encrypted_b64, msg_encrypted_b64, signature_b64, hmac_b64])
+        ctx = b'|'.join([adata_b64, enc_algorithm, R_encrypted_b64, msg_encrypted_b64, sig_algorithm_b64, signature_b64, hmac_b64])
         return ctx
 
     def decrypt(self, ctx, sender_name, verfiy_also=True):
@@ -87,10 +89,13 @@ class PKFernet:
         signing_pub_key. Which encryption key to use, and which verification key to use is specified in the 
         ciphertext. """
         ctx_list = ctx.split(b'|')
-        [adata_b64, enc_algorithm, R_encrypted_b64, msg_encrypted_b64, signature_b64, hmac_b64]  = ctx_list
+        [adata_b64, enc_algorithm, R_encrypted_b64, msg_encrypted_b64, sig_algorithm, signature_b64, hmac_b64]  = ctx_list
         logging.debug('Parsed ciphertext')
 
         if enc_algorithm != b'rsa.2048.1':
+            raise UnsupportedAlgorithm
+
+        if base64.urlsafe_b64decode(sig_algorithm) != b'rsa_with_sha256.2048.1':
             raise UnsupportedAlgorithm
 
         #  Loading sender's private encryption key
@@ -130,12 +135,7 @@ class PKFernet:
         logging.debug('Decrypted {msg}')
 
         # Verifying signature
-        # max split is 1 in case there is b'|' in signature
-        [sig_algorithm, signature] = base64.urlsafe_b64decode(signature_b64).split(b'|', 1)
-
-        if sig_algorithm != b'rsa_with_sha256.2048.1':
-            raise UnsupportedAlgorithm
-
+        signature = base64.urlsafe_b64decode(signature_b64)
         verifier = sender_sig_pub_key.verifier(
             signature,
             padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),

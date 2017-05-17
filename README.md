@@ -22,32 +22,33 @@ Ciper Suite:
 ## Test Result (pytest-cov)
 
 
+
+    Connected to pydev debugger (build 171.4163.6)
+     Launching py.test with arguments --cov=. /Users/_/PKFernet/PKFernet.py in /Users/kylin1989/VM/dev/PKFernet
     ============================= test session starts ==============================
     platform darwin -- Python 3.5.2, pytest-3.0.7, py-1.4.33, pluggy-0.4.0
     rootdir: /Users/_/PKFernet, inifile:
     plugins: cov-2.4.0
     collected 2 items
      
-    PKFernet.py     
+    PKFernet.py    . 2017-05-17 17:11:40,042:DEBUG:Parsed ciphertext
+    2017-05-17 17:11:40,044:DEBUG:Loaded sender's private encryption key
+    2017-05-17 17:11:40,049:DEBUG:Decrypted R = (R_sym || R_hmac)
+    2017-05-17 17:11:40,050:DEBUG:Verified HMAC
+    2017-05-17 17:11:40,051:DEBUG:Decrypted {msg}
+    2017-05-17 17:11:40,052:DEBUG:Decrypted signature
+      . 
        
     ---------- coverage: platform darwin, python 3.5.2-final-0 -----------
-    Name               Stmts   Miss  Cover
-    --------------------------------------
-    PKFernet.py          115      3    97%
-    serialize_pem.py      12     12     0%
-    --------------------------------------
-    TOTAL                127     15    88%
+    Name          Stmts   Miss  Cover
+    ---------------------------------
+    PKFernet.py     116      3    97%
     
     
-    =========================== 2 passed in 0.48 seconds ===========================
-     . 2017-05-17 00:14:12,169:DEBUG:Parsed ciphertext
-    2017-05-17 00:14:12,169:DEBUG:Loaded sender's private encryption key
-    2017-05-17 00:14:12,172:DEBUG:Decrypted R = (R_sym || R_hmac)
-    2017-05-17 00:14:12,172:DEBUG:Verified HMAC
-    2017-05-17 00:14:12,172:DEBUG:Decrypted {msg}
-    2017-05-17 00:14:12,173:DEBUG:Decrypted signature
-     .  
+    =========================== 2 passed in 0.59 seconds ===========================
+      
     Process finished with exit code 0
+
 
 
 ## Reference
