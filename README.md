@@ -1,15 +1,76 @@
 # PKFernet
 
+By Chris Wang
+
+An application-layer hybrid encryption scheme that allow users to send messages asynchronously with others without a pre-shared secret key.  
+
+Ciper Suite:
+* Symertic Encryption: AES-256 CTR MODE
+* Asymmetric Encryption: RSA-2048
+* Digital Signature: RSA with SHA-256
+* HMAC: SHA-256
+
 ## Instruction
 
 * RSA
-    * Generate  private key: `openssl genrsa -out <priv.key>`
+    * Generate  public-private key-pair: `openssl genrsa -out <priv.key> 2048`
     * Inspect Private key: `openssl rsa -text -in <priv.key>`
-    * Generate Public key: `openssl rsa -in <priv.key> -pubout -out  <pub.key>`  
+    * Extract Public key: `openssl rsa -in <priv.key> -pubout -out  <pub.key>`  
 * To Make PEM url-safe for pasting into .json: `cat <priv.key> | tr '+/' '-_' | sed 'N;s/\n/\\n/g'`
 
 
+## Test Result (pytest-cov)
+
+
+    ============================= test session starts ==============================
+    platform darwin -- Python 3.5.2, pytest-3.0.7, py-1.4.33, pluggy-0.4.0
+    rootdir: /Users/_/PKFernet, inifile:
+    plugins: cov-2.4.0
+    collected 2 items
+     
+    PKFernet.py     
+       
+    ---------- coverage: platform darwin, python 3.5.2-final-0 -----------
+    Name               Stmts   Miss  Cover
+    --------------------------------------
+    PKFernet.py          115      3    97%
+    serialize_pem.py      12     12     0%
+    --------------------------------------
+    TOTAL                127     15    88%
+    
+    
+    =========================== 2 passed in 0.48 seconds ===========================
+     . 2017-05-17 00:14:12,169:DEBUG:Parsed ciphertext
+    2017-05-17 00:14:12,169:DEBUG:Loaded sender's private encryption key
+    2017-05-17 00:14:12,172:DEBUG:Decrypted R = (R_sym || R_hmac)
+    2017-05-17 00:14:12,172:DEBUG:Verified HMAC
+    2017-05-17 00:14:12,172:DEBUG:Decrypted {msg}
+    2017-05-17 00:14:12,173:DEBUG:Decrypted signature
+     .  
+    Process finished with exit code 0
+
+
 ## Reference
-* Python Cryptography's Fernet implementatin: https://github.com/pyca/cryptography/blob/master/src/cryptography/fernet.py
-* `sed` command: https://www.gnu.org/software/sed/manual/sed.html
-* `tr` command: https://www.gnu.org/software/coreutils/manual/html_node/tr-invocation.html#tr-invocation
+### cryptography.io
+* RSA: https://cryptography.io/en/latest/hazmat/primitives/asymmetric/rsa/
+* Key Serialization: https://cryptography.io/en/latest/hazmat/primitives/asymmetric/serialization/
+* Fernet Implementation: https://github.com/pyca/cryptography/blob/master/src/cryptography/fernet.py
+* Random number generation: https://cryptography.io/en/latest/random-numbers/
+* HMAC: https://cryptography.io/en/latest/hazmat/primitives/mac/hmac/
+
+### Python 
+* Base64 Encoding/Decoding: https://docs.python.org/3/library/base64.html
+
+
+## Know Issues
+### `TypeError: initializer for ctype 'char[]' must be a bytes or list or tuple, not str`
+Solution: Cast string to bytes using `bytes()`.
+
+###  "TypeError: string argument without an encoding"
+Solution: Specify encoding in `bytes(str, 'utf-8'')`.
+
+## `ValueError: Unable to load certificate` in `load_pem_x509_certificate`
+Solution: 
+Not in PEM format.
+http://stackoverflow.com/questions/41891701/how-to-extract-public-key-from-a-x509-certificate-in-python
+
