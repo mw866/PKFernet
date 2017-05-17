@@ -1,13 +1,7 @@
 from __future__ import absolute_import, division, print_function
 
-import base64
-import os
-import struct
-import time
-import logging
-import json
+import base64, os, logging, json
 
-from cryptography import x509
 from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization, ciphers, hmac
@@ -20,7 +14,6 @@ class PKFernet:
         """ loads all private keys and public keys in the keyrings. Keyring is a proxy for real key management system, and it is simply a json blob containing keys in PEM format. 
         @priv_keyring (local) contains all the private keys 
         @public_keyrings (remote) contains all the public keys of the friends with whom you want to share messages. """
-        # TODO
         self.remote_public_keyrings = public_keyrings
         self.local_private_key_ring = self.import_priv_key(priv_keyring)
 
@@ -121,13 +114,11 @@ class PKFernet:
         R_sym, R_hmac = R[:32], R[32:]
         logging.debug('Decrypted R = (R_sym || R_hmac)')
 
-
         # Verify HMAC
         h = hmac.HMAC(R_hmac, hashes.SHA256(), backend=default_backend())
         h.update(adata_b64 + b'|' + msg_encrypted_b64 + b'|'+ signature_b64)
         h.verify(base64.urlsafe_b64decode(hmac_b64))
         logging.debug('Verified HMAC')
-
 
         # Symetrically decrypt {msg}
         iv = b'\x00' * 16
@@ -170,11 +161,11 @@ class PKFernet:
                    )
 
                 public_key_bytes = private_key_value.public_key().public_bytes(
-                    encoding=serialization.Encoding.PEM, # https://cryptography.io/en/latest/hazmat/primitives/asymmetric/serialization/#cryptography.hazmat.primitives.serialization.Encoding
-                    format=serialization.PublicFormat.SubjectPublicKeyInfo  # https://cryptography.io/en/latest/hazmat/primitives/asymmetric/serialization/#cryptography.hazmat.primitives.serialization.PublicFormat
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
                 )
                 public_keys_dict[public_key_alias] = self.serialize(str(public_key_bytes, 'utf-8'))
-        public_keys_json = json.dumps(public_keys_dict, indent=4)
+        public_keys_json = json.dumps(public_keys_dict, indent=2, sort_keys=True)
         return public_keys_json
 
     def import_pub_keys(self, remote_name, remote_public_keyring):
@@ -191,7 +182,7 @@ class PKFernet:
             return private_keys
 
     def deserialize(self, pem_string):
-        ''' deserialize the key value in the json keystrings '''
+        """ deserialize the key value in the json keystrings """
         # For some reason, '\\n' does not work
         pem_text_list = pem_string.split('\n')
         pem_payload_text = ('\n'.join(pem_text_list[1:-2])).replace('-', '+').replace('_', '/')
@@ -199,28 +190,38 @@ class PKFernet:
         return pem_text_deserialized
 
     def serialize(self, pem_string):
-        pem_text_serialized = pem_string.replace('+', '-').replace('/', '_').replace('\n', '\\n')
+        """ serialize the raw pem key value for the json keystrings """
+        pem_text_serialized = pem_string.replace('+', '-').replace('/', '_')
         return pem_text_serialized
 
 
+class TestPKFernet(object):
+    """pytest class for PKFernet"""
 
-def test_basic():
-   # Sender sends the message
-    msg = b'this is a test message'
-    sender_pf = PKFernet(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='receiver/receiver_pub_keyrings.json')
-    ctx = sender_pf.encrypt(msg, receiver_name='receiver', receiver_enc_pub_key_alias='rsa.2048.1.enc.priv', sender_sign_header='rsa.2048.1.sig.priv', adata='', sign_also = True)
+    def test_basic(self):
+        """Test basic ecnryption and decryption"""
+        # Sender sends the message
+        msg = b'this is a test message'
+        sender_pf = PKFernet(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='receiver/receiver_pub_keyrings.json')
+        ctx = sender_pf.encrypt(msg, receiver_name='receiver', receiver_enc_pub_key_alias='rsa.2048.1.enc.priv', sender_sign_header='rsa.2048.1.sig.priv', adata='', sign_also = True)
 
-    # Receiver receives the message
-    receiver_pf = PKFernet(priv_keyring='receiver/receiver_priv_keyring.json', public_keyrings='sender/sender_pub_keyrings.json')
-    m = receiver_pf.decrypt(ctx, sender_name='sender', verfiy_also=True)
+        # Receiver receives the message
+        receiver_pf = PKFernet(priv_keyring='receiver/receiver_priv_keyring.json', public_keyrings='sender/sender_pub_keyrings.json')
+        m = receiver_pf.decrypt(ctx, sender_name='sender', verfiy_also=True)
 
-    # TODO Correct usage of the following functions
-    my_pub_keys_json_blob = sender_pf.export_pub_keys(key_alias_list=[])
-    # pf.import_pub_keys(receiver_name, receiver_public_keyring)
+        assert (msg == m)
 
-    assert(msg == m)
+    def test_export_pub_keys(self):
+        """Test export public keys in JSON"""
+        # Exporting sender public keys from private keys
+        sender_pf = PKFernet(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='receiver/receiver_pub_keyrings.json')
+        sender_pub_key_json_export = sender_pf.export_pub_keys(key_alias_list=[])
+
+        # Loading sender existing public keyring file
+        with open('sender/sender_pub_keyrings.json', 'r', encoding='utf-8') as f:
+            sender_pub_key_json_file = f.read()
+
+        assert sender_pub_key_json_export.replace(' ', '') in sender_pub_key_json_file.replace(' ', '')
 
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s:%(levelname)s:%(message)s")
-    test_basic()
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s:%(levelname)s:%(message)s")
