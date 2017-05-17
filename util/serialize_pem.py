@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-
+"""Use to serialze the original key value in pem to URL-safe string for JSON"""
 import sys
 
 def main():
@@ -9,8 +8,9 @@ def main():
     f = open(sys.argv[1], 'r')
     f.seek(0)
     text = f.read()
-    print(text.replace('+', '-').replace('//', '_').replace('\n', '\\n'))
     f.close()
+    print(text.replace('+', '-').replace('/', '_').replace('\n', '\\n'))
+
 
 if __name__ == '__main__':
     main()
