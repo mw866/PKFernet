@@ -69,7 +69,7 @@ class PKFernet:
         # Generating HMAC
         R_hmac = os.urandom(32)
         h = hmac.HMAC(R_hmac, hashes.SHA256(), backend=default_backend())
-        h.update(adata_b64 + b'|' + msg_encrypted_b64 + b'|'+ signature_b64)
+        h.update(adata_b64 + b'|' + msg_encrypted_b64 + b'|'+  sig_algorithm_b64 + b'|'+ signature_b64)
         hmac_b64 = base64.urlsafe_b64encode(h.finalize())
 
         # Loading receiver's encryption public key for encrypting the symmetric keys
@@ -87,20 +87,26 @@ class PKFernet:
 
         # Ciphertext format: [adata_b64, enc_algorithm, R_encrypted_b64, msg_encrypted_b64, signature_b64, hmac_b64]
         ctx = b'|'.join([adata_b64, enc_algorithm, R_encrypted_b64, msg_encrypted_b64, sig_algorithm_b64, signature_b64, hmac_b64])
+
+        logging.debug('Generated ciphertext:')
         return ctx
 
     def decrypt(self, ctx, sender_name, verfiy_also=True):
         """ Decrypt the ciphertext ctx, using receiver's encryption_priv_key and verify signature using sender's 
         signing_pub_key. Which encryption key to use, and which verification key to use is specified in the 
         ciphertext. """
+
+        if  isinstance(ctx, str):
+            ctx = bytes(ctx, 'utf-8')
+
         ctx_list = ctx.split(b'|')
-        [adata_b64, enc_algorithm, R_encrypted_b64, msg_encrypted_b64, sig_algorithm, signature_b64, hmac_b64]  = ctx_list
+        [adata_b64, enc_algorithm, R_encrypted_b64, msg_encrypted_b64, sig_algorithm_b64, signature_b64, hmac_b64]  = ctx_list
         logging.debug('Parsed ciphertext')
 
         if b'rsa.2048.1' not in enc_algorithm:
             raise UnsupportedAlgorithm
 
-        if b'rsa_with_sha256.2048.1' not in base64.urlsafe_b64decode(sig_algorithm):
+        if b'rsa_with_sha256.2048.1' not in base64.urlsafe_b64decode(sig_algorithm_b64):
             raise UnsupportedAlgorithm
 
         #  Loading sender's private encryption key
@@ -126,7 +132,7 @@ class PKFernet:
 
         # Verify HMAC
         h = hmac.HMAC(R_hmac, hashes.SHA256(), backend=default_backend())
-        h.update(adata_b64 + b'|' + msg_encrypted_b64 + b'|'+ signature_b64)
+        h.update(adata_b64 + b'|' + msg_encrypted_b64 + b'|'+ sig_algorithm_b64 + b'|'+ signature_b64)
         h.verify(base64.urlsafe_b64decode(hmac_b64))
         logging.debug('Verified HMAC')
 
@@ -209,7 +215,7 @@ class TestPKFernet(object):
         msg = b'this is a test message'
         sender_pf = PKFernet(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='receiver/receiver_pub_keyrings.json')
         ctx = sender_pf.encrypt(msg, receiver_name='receiver', receiver_enc_pub_key_alias='rsa.2048.1.enc.priv', sender_sign_header='rsa_with_sha256.2048.1', adata='', sign_also=True)
-
+        print(str(ctx, 'utf-8'))
         # Receiver receives the message
         receiver_pf = PKFernet(priv_keyring='receiver/receiver_priv_keyring.json', public_keyrings='sender/sender_pub_keyrings.json')
         m = receiver_pf.decrypt(ctx, sender_name='sender', verfiy_also=True)
@@ -227,6 +233,22 @@ class TestPKFernet(object):
             sender_pub_key_json_file = f.read()
 
         assert sender_pub_key_json_export.replace(' ', '') in sender_pub_key_json_file.replace(' ', '')
+
+    def test_cross_decryption(self):
+        "Cross test with brook's ciphertext and public key"
+
+        with open('brook/ciphertext.txt', 'r', encoding='utf-8') as f:
+            brook_ciphertext = f.read()
+
+        brook_pf = PKFernet(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='brook/public_key.json')
+        m = brook_pf.decrypt(brook_ciphertext, sender_name='brook', verfiy_also=True)
+        print(m)
+
+    def test_cross_encryption(self):
+        msg = b'this is a test message'
+        sender_pf = PKFernet(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='brook/public_key.json')
+        ctx = sender_pf.encrypt(msg, receiver_name='brook', receiver_enc_pub_key_alias='rsa.2048.1.enc.priv', sender_sign_header='rsa_with_sha256.2048.1', adata='', sign_also=True)
+        print(str(ctx, 'utf-8'))
 
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s:%(levelname)s:%(message)s")
