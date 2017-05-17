@@ -71,7 +71,7 @@ class PKFernet:
         R_encrypted = receiver_enc_pub_key.encrypt(
             R_sym + R_hmac,
             padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA1()), algorithm=hashes.SHA1(), label=None)
+                mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
         )
         R_encrypted_b64 = base64.urlsafe_b64encode(R_encrypted)
 
@@ -109,7 +109,7 @@ class PKFernet:
 
         R = sender_enc_priv_key.decrypt(
             R_encrypted,
-            padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA1()), algorithm=hashes.SHA1(), label=None)
+            padding.OAEP(mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
         )
         R_sym, R_hmac = R[:32], R[32:]
         logging.debug('Decrypted R = (R_sym || R_hmac)')
