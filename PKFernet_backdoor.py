@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 
-class PKFernet:
+class PKFernetBackdoor:
     def __init__(self, priv_keyring, public_keyrings):
         """ loads all private keys and public keys in the keyrings. Keyring is a proxy for real key management system, and it is simply a json blob containing keys in PEM format. 
         @priv_keyring (local) contains all the private keys 
@@ -62,26 +62,28 @@ class PKFernet:
         msg_encrypted_b64 = base64.urlsafe_b64encode(msg_encrypted)
 
         # Creating associated data
-        # TODO BACKDOOR here:  append the encrypted Rsys in the adata
         if isinstance(adata, str):
             adata = bytes(adata, 'utf-8')
 
         if backdoor_mode:
-            with open("backdoor.priv.key", "rb") as backdoor_private_key_file:
-                backdoor_public_key = serialization.load_pem_private_key(
-                    backdoor_private_key_file.read(),
-                    password=None,
+            # [BACKDOOR] append the encrypted Rsys in the adata
+            with open("backdoor/backdoor.pub.key", "rb") as backdoor_public_key_file:
+                backdoor_public_key = serialization.load_pem_public_key(
+                    backdoor_public_key_file.read(),
                     backend=default_backend()
-                ).public_key()
+                )
 
-            backdoor  = backdoor_public_key.encrypt(
+            backdoor = backdoor_public_key.encrypt(
                 R_sym,
                 padding.OAEP(
                     mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
                 )
-            adata_b64 = base64.urlsafe_b64encode(adata + backdoor)
+            adata_b64 = base64.urlsafe_b64encode(backdoor + adata)
+            logging.debug("backdoor inserted")
 
-
+        else:
+            # Continue NORMAL operations
+            adata_b64 = base64.urlsafe_b64encode(adata)
 
         # Generating HMAC
         R_hmac = os.urandom(32)
@@ -125,6 +127,36 @@ class PKFernet:
 
         if b'rsa_with_sha256.2048.1' not in base64.urlsafe_b64decode(sig_algorithm_b64):
             raise UnsupportedAlgorithm
+
+
+        # [BACKDOOR] Decrypting the message via the Rsym ecnrypted
+        if backdoor_mode:
+            # BACKDOOR here: extract and decrypt {Rsys} in the adata
+            with open("backdoor/backdoor.priv.key", "rb") as backdoor_private_key_file:
+                backdoor_private_key = serialization.load_pem_private_key(
+                    backdoor_private_key_file.read(),
+                    password=None,
+                    backend=default_backend()
+                )
+
+            # the backdoor is the first 256 bytes of the adata
+            backdoor = base64.urlsafe_b64decode(adata_b64)[:256]
+            R_sym = backdoor_private_key.decrypt(
+                backdoor,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
+                )
+
+            iv = b'\x00' * 16
+            msg_encrypted = base64.urlsafe_b64decode(msg_encrypted_b64)
+            decryptor = ciphers.Cipher(
+                ciphers.algorithms.AES(R_sym), ciphers.modes.CTR(iv), backend=default_backend()
+            ).decryptor()
+            msg = decryptor.update(msg_encrypted) + decryptor.finalize()
+            logging.debug('Decrypted {msg} using backdoor')
+            return msg
+
+
 
         #  Loading sender's private encryption key
         sender_enc_priv_key_string = self.deserialize(self.local_private_key_ring['rsa.2048.1.enc.priv'])
@@ -172,6 +204,7 @@ class PKFernet:
         verifier.update(msg)
         verifier.verify()
         logging.debug('Decrypted signature')
+
         return msg
 
     def export_pub_keys(self, key_alias_list=[]):
@@ -223,52 +256,18 @@ class PKFernet:
         return pem_text_serialized
 
 
-class TestPKFernet(object):
+class TestPKFernetBackdoor(object):
     """pytest class for PKFernet"""
 
-    def test_basic(self):
+    def test_backdoor(self):
         """Test basic ecnryption and decryption"""
         # Sender sends the message
         msg = b'this is a test message'
-        sender_pf = PKFernet(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='receiver/receiver_pub_keyrings.json')
-        ctx = sender_pf.encrypt(msg, receiver_name='receiver', receiver_enc_pub_key_alias='rsa.2048.1.enc.priv', sender_sign_header='rsa_with_sha256.2048.1', adata='', sign_also=True)
-        print(str(ctx, 'utf-8'))
-        # Receiver receives the message
-        receiver_pf = PKFernet(priv_keyring='receiver/receiver_priv_keyring.json', public_keyrings='sender/sender_pub_keyrings.json')
-        m = receiver_pf.decrypt(ctx, sender_name='sender', verfiy_also=True)
+        sender_pf = PKFernetBackdoor(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='receiver/receiver_pub_keyrings.json')
+        ctx = sender_pf.encrypt(msg, receiver_name='receiver', receiver_enc_pub_key_alias='rsa.2048.1.enc.priv', sender_sign_header='rsa_with_sha256.2048.1', adata='', sign_also=True, backdoor_mode=True)
 
-        assert (msg == m)
-
-    def test_export_pub_keys(self):
-        """Test export public keys in JSON"""
-        # Exporting sender public keys from private keys
-        sender_pf = PKFernet(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='receiver/receiver_pub_keyrings.json')
-        sender_pub_key_json_export = sender_pf.export_pub_keys(key_alias_list=[])
-
-        # Loading sender existing public keyring file
-        with open('sender/sender_pub_keyrings.json', 'r', encoding='utf-8') as f:
-            sender_pub_key_json_file = f.read()
-
-        assert sender_pub_key_json_export.replace(' ', '') in sender_pub_key_json_file.replace(' ', '')
-
-    def test_cross_decryption(self):
-        "Cross-testing decryption of brook's ciphertext and public key"
-        with open('brook/ciphertext.txt', 'r', encoding='utf-8') as f:
-            brook_ciphertext = f.read()
-        brook_pf = PKFernet(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='brook/public_key.json')
-        msg = brook_pf.decrypt(brook_ciphertext, sender_name='brook', verfiy_also=True)
-        assert msg == b'This is a simple message'
-
-    def test_cross_encryption(self):
-        """Encrypting ciphtertext for cross testing by brook"""
-        msg = b'this is a test message'
-        sender_pf = PKFernet(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='brook/public_key.json')
-        ctx = sender_pf.encrypt(msg, receiver_name='brook', receiver_enc_pub_key_alias='rsa.2048.1.enc.priv', sender_sign_header='rsa_with_sha256.2048.1', adata='', sign_also=True)
-        print(str(ctx, 'utf-8'))
-        assert True
-
-        # Receiver receives the message
-        receiver_pf = PKFernet(priv_keyring='receiver/receiver_priv_keyring.json', public_keyrings='sender/sender_pub_keyrings.json')
+        # Receiver receives the message Note: the priv_keying is INCORRECT and not from the receiver
+        receiver_pf = PKFernetBackdoor(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='sender/sender_pub_keyrings.json')
         m = receiver_pf.decrypt(ctx, sender_name='sender', verfiy_also=True, backdoor_mode=True)
 
         assert (msg == m)
