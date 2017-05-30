@@ -48,9 +48,9 @@ Ciper Suite:
 * Ask.sig → Senders private signing key
 
 * Symmetric encryption is very similar to what was done for pwfernet:
--	256-bit AES in Counter Mode, as implemented in cryptography.io primitives.ciphers 
--	IV is all 0’s (use chr, not ‘0’)
--	As mentioned above, the key is the first half of what was generated for R
+   *	256-bit AES in Counter Mode, as implemented in cryptography.io primitives.ciphers 
+   *	IV is all 0’s (use chr, not ‘0’)
+   *	As mentioned above, the key is the first half of what was generated for R
 
 
 ## The backdoor version: `PKFernet_backdoor.py`
