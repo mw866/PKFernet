@@ -1,8 +1,6 @@
-# PKFernet
+# PKFernet: Public Key Authenticated and Hybrid Encryption
 
-By Chris Wang
-
-An application-layer hybrid encryption scheme that allow users to send messages asynchronously with others without a pre-shared secret key.  
+An application-layer hybrid encryption scheme that allow users to sign adn send messages asynchronously with others without a pre-shared secret key.  
 
 Ciper Suite:
 * Symertic Encryption: AES-256 CTR MODE
@@ -10,45 +8,58 @@ Ciper Suite:
 * Digital Signature: RSA with SHA-256
 * HMAC: SHA-256
 
-## Instruction
 
-* RSA
+
+## Instruction
+* Run unit test: `pytest test_xxx.py`
+* OpenSSL
     * Generate  public-private key-pair: `openssl genrsa -out <priv.key> 2048`
     * Inspect Private key: `openssl rsa -text -in <priv.key>`
     * Extract Public key: `openssl rsa -in <priv.key> -pubout -out  <pub.key>`  
-* To Make PEM url-safe for pasting into .json: `cat <priv.key> | tr '+/' '-_' | sed 'N;s/\n/\\n/g'`
+
+## The backdoor version: `PKFernet.py`
+
+### Encryption
+
+1.	message
+   *   Sign with private key Ask.sig
+2.	message | sig_algorithm | signature
+   *   b64 encode sig_algorithm and signature, joined together by chr(124)
+3.	message | b64_<sig_algorithm | signature>
+   *   symmetric encryption* on message with Rsym, then base64 encode
+4.	b64_{message}Rsym | b64_<sig_algorithm | signature>
+   *   HMAC on <b64_AD | the above> with RHMAC
+5.	b64_{message}Rsym | b64_<sig_algorithm | signature> | b64_HMAC
+   *   asymmetricaly encrypt full symmetric key with Bpk.enc and b64 encode result
+6.	b64_{R}Bpk.enc | b64_{message}Rsym | b64_<sig_algorithm | signature> | b64_HMAC
+   *   attach unencrypted metadata
+7.	b64_AD | asym_algo | b64_{R}Bpk.enc | b64_{message}Rsym | b64_<sig_algorithm | signature> | b64_HMAC
+   * Final ciphertext
+
+### Decryption (Vice Versa)
 
 
-## Test Result (pytest-cov)
+**Notes**
+
+* Pipe characters are used throughout
+* R → Generate with os.urandom and split in half <Symmetric Key (Rsym) || HMAC Key (RHMAC)>
+* Bpk.enc → Receivers public encryption key
+* Ask.sig → Senders private signing key
+
+* Symmetric encryption is very similar to what was done for pwfernet:
+-	256-bit AES in Counter Mode, as implemented in cryptography.io primitives.ciphers 
+-	IV is all 0’s (use chr, not ‘0’)
+-	As mentioned above, the key is the first half of what was generated for R
 
 
+## The backdoor version: `PKFernet_backdoor.py`
 
-    Connected to pydev debugger (build 171.4163.6)
-     Launching py.test with arguments --cov=. /Users/_/PKFernet/PKFernet.py in /Users/kylin1989/VM/dev/PKFernet
-    ============================= test session starts ==============================
-    platform darwin -- Python 3.5.2, pytest-3.0.7, py-1.4.33, pluggy-0.4.0
-    rootdir: /Users/_/PKFernet, inifile:
-    plugins: cov-2.4.0
-    collected 2 items
-     
-    PKFernet.py    . 2017-05-17 17:11:40,042:DEBUG:Parsed ciphertext
-    2017-05-17 17:11:40,044:DEBUG:Loaded sender's private encryption key
-    2017-05-17 17:11:40,049:DEBUG:Decrypted R = (R_sym || R_hmac)
-    2017-05-17 17:11:40,050:DEBUG:Verified HMAC
-    2017-05-17 17:11:40,051:DEBUG:Decrypted {msg}
-    2017-05-17 17:11:40,052:DEBUG:Decrypted signature
-      . 
-       
-    ---------- coverage: platform darwin, python 3.5.2-final-0 -----------
-    Name          Stmts   Miss  Cover
-    ---------------------------------
-    PKFernet.py     116      3    97%
-    
-    
-    =========================== 2 passed in 0.59 seconds ===========================
-      
-    Process finished with exit code 0
+The backdoor in  the PKFernet_backdoor.py bypasses the authentication and integrity check by sending over the encrypted R_{sym} that can only by decrypted by the backdoor implementor. Here is how it works:
 
+- During encryption, the backdoor encrypts the R_{sym} using the implementor's public key. And the encrypted R_{sym} is then appended to the adata field.
+- During decryption, the backdoor implementor decrypts the  R_{sym} in the adata field using the implementor's private key. And the encrypted message is decrypted using the R_{sym}
+
+The backdoor is enabled by setting  backdoor_mode=True in the encrypt() and decrypt() in the PKFernet_backdoor class. It is also demonstrated in the  pytest script TestPKFernetBackdoor()
 
 
 ## Reference
