@@ -1,5 +1,6 @@
 from PKFernet import PKFernet
 
+
 def test_loopback():
     """Test basic ecnryption and decryption"""
     # Sender sends the message
@@ -13,6 +14,7 @@ def test_loopback():
 
     assert (msg == m)
 
+
 def test_export_pub_keys():
     """Test export public keys in JSON"""
     # Exporting sender public keys from private keys
@@ -25,6 +27,7 @@ def test_export_pub_keys():
 
     assert sender_pub_key_json_export.replace(' ', '') in sender_pub_key_json_file.replace(' ', '')
 
+
 def test_cross_decryption():
     "Cross-testing decryption of brook's ciphertext and public key"
     with open('brook/ciphertext.txt', 'r', encoding='utf-8') as f:
@@ -32,6 +35,7 @@ def test_cross_decryption():
     brook_pf = PKFernet(priv_keyring='sender/sender_priv_keyring.json', public_keyrings='brook/public_key.json')
     msg = brook_pf.decrypt(brook_ciphertext, sender_name='brook', verfiy_also=True)
     assert msg == b'This is a simple message'
+
 
 def test_cross_encryption():
     """Encrypting ciphtertext for cross testing by brook"""

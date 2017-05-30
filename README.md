@@ -16,8 +16,9 @@ Ciper Suite:
     * Generate  public-private key-pair: `openssl genrsa -out <priv.key> 2048`
     * Inspect Private key: `openssl rsa -text -in <priv.key>`
     * Extract Public key: `openssl rsa -in <priv.key> -pubout -out  <pub.key>`  
+     
 
-## The backdoor version: `PKFernet.py`
+## The non-backdoor version: `PKFernet.py`
 
 ### Encryption
 
