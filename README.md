@@ -1,6 +1,6 @@
 # PKFernet: Public Key Authenticated and Hybrid Encryption
 
-An application-layer hybrid encryption scheme that allow users to sign adn send messages asynchronously with others without a pre-shared secret key.  
+An application-layer hybrid encryption scheme that allow users to sign and send messages asynchronously with others without a pre-shared secret key.  
 
 Ciper Suite:
 * Symertic Encryption: AES-256 CTR MODE
